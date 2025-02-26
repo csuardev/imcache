@@ -249,9 +249,9 @@ func (c *Cache[K, V]) getAll(now time.Time) map[K]V {
 	return got
 }
 
-// GetAndDelete returns the value for the given key
+// GetAndRemove returns the value for the given key
 // and delete it even if it is not expired
-func (c *Cache[K, V]) GetAndDelete(key K) (V, bool) {
+func (c *Cache[K, V]) GetAndRemove(key K) (V, bool) {
 	now := nowf()
 	var zero V
 	c.mu.Lock()
@@ -896,10 +896,10 @@ func (s *Sharded[K, V]) Get(key K) (value V, present bool) {
 	return s.shard(key).Get(key)
 }
 
-// GetAndDelete returns the value for the given key and delete it even if it
+// GetAndRemove returns the value for the given key and delete it even if it
 //isn't expired
-func (s *Sharded[K, V]) GetAndDelete(key K) (value V, present bool) {
-	return s.shard(key).GetAndDelete(key)
+func (s *Sharded[K, V]) GetAndRemove(key K) (value V, present bool) {
+	return s.shard(key).GetAndRemove(key)
 }
 
 // GetMultiple returns the values for the given keys.
