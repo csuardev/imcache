@@ -33,6 +33,7 @@ func TestMain(m *testing.M) {
 
 type imcache[K comparable, V any] interface {
 	Get(key K) (v V, present bool)
+	GetAndDelete(key K) (v V, present bool)
 	GetMultiple(keys ...K) map[K]V
 	GetAll() map[K]V
 	Peek(key K) (v V, present bool)
@@ -941,6 +942,53 @@ func TestImcache_GetAll_SlidingExpiration(t *testing.T) {
 	}
 }
 
+//GetAndDelete Tests Init
+func TestImcache_GetAndDelete(t *testing.T) {
+	for _, cache := range caches {
+		t.Run(cache.name, func(t *testing.T) {
+			c := cache.create()
+			c.Set("foo", "foo", WithNoExpiration())
+			c.Set("foobar", "foobar", WithExpiration(time.Hour))
+
+			//get foobar item and delete it
+			c.GetAndDelete("foobar")
+
+			got := c.GetAll()
+			want := map[string]string{
+				"foo": "foo",
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("imcache.GetAndDelete() = %v, want %v", got, want)
+			}
+		})
+	}
+}
+func TestImcache_GetAndDelete_Whit_Expiration(t *testing.T) {
+	for _, cache := range caches {
+		t.Run(cache.name, func(t *testing.T) {
+			c := cache.create()
+			c.Set("foo", "foo", WithNoExpiration())
+			c.Set("foobar", "foobar", WithExpiration(time.Hour))
+			c.Set("bar", "bar", WithExpiration(200*time.Nanosecond))
+
+			//advance time to force expiration
+			clock.AdvanceTime(300 * time.Millisecond)
+			//get foobar item and delete it
+			//bar gets deleted because expiration
+			c.GetAndDelete("foobar")
+
+			got := c.GetAll()
+			want := map[string]string{
+				"foo": "foo",
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("imcache.GetAndDelete() = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+//GetAndDelete Tests End
 func TestImcache_Len(t *testing.T) {
 	for _, cache := range caches {
 		t.Run(cache.name, func(t *testing.T) {
