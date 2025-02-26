@@ -249,6 +249,38 @@ func (c *Cache[K, V]) getAll(now time.Time) map[K]V {
 	return got
 }
 
+// GetAndDelete returns the value for the given key
+// and delete it even if it is not expired
+func (c *Cache[K, V]) GetAndDelete(key K) (V, bool) {
+	now := nowf()
+	var zero V
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed {
+		return zero, false
+	}
+	node, ok := c.m[key]
+	if !ok {
+		return zero, false
+	}
+	entry := node.entry()
+	if entry.expired(now) {
+		c.queue.remove(node)
+		delete(c.m, key)
+		if c.onEviction != nil {
+			go c.onEviction(key, entry.val, EvictionReasonExpired)
+		}
+		return zero, false
+	}
+	entry.slide(now)
+	node.setEntry(entry)
+	c.queue.touch(node)
+
+	//delete after retrieve
+	delete(c.m, key)
+	return entry.val, true
+}
+
 // Peek returns the value for the given key without
 // actively evicting the entry if it is expired and
 // updating the entry's sliding expiration.
@@ -862,6 +894,12 @@ func (s *Sharded[K, V]) shardIndex(key K) int {
 // If it encounters an expired entry, the expired entry is evicted.
 func (s *Sharded[K, V]) Get(key K) (value V, present bool) {
 	return s.shard(key).Get(key)
+}
+
+// GetAndDelete returns the value for the given key and delete it even if it
+//isn't expired
+func (s *Sharded[K, V]) GetAndDelete(key K) (value V, present bool) {
+	return s.shard(key).GetAndDelete(key)
 }
 
 // GetMultiple returns the values for the given keys.
